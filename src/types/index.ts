@@ -6,9 +6,13 @@ export type TaskType =
   | 'twitter_retweet'
   | 'discord_join'
   | 'hold_token'
+  | 'hold_nft'
   | 'submit_screenshot'
   | 'custom';
 export type TaskStatus = 'locked' | 'available' | 'completed' | 'pending_verification';
+
+/** Chains we can verify onchain task state for via viem. */
+export type OnchainChain = 'ETH' | 'BASE' | 'ARB' | 'MATIC' | 'BNB' | 'AVAX';
 
 export interface Campaign {
   id: string;
@@ -30,6 +34,22 @@ export interface Campaign {
   tasks?: Task[];
 }
 
+export interface OnchainTaskConfig {
+  /** Which chain the contract lives on. */
+  chain: OnchainChain;
+  /** Token / NFT contract address (0x...). */
+  contractAddress: `0x${string}`;
+  /**
+   * Minimum balance the wallet must hold.
+   * For ERC-20 this is a UI-unit amount (e.g. 100 = 100 USDC); the verifier
+   * uses the on-chain `decimals()` to scale.
+   * For ERC-721 this is the minimum NFT count.
+   */
+  minBalance: number;
+  /** Optional human-readable label (e.g. "USDC", "Pudgy Penguins"). */
+  symbol?: string;
+}
+
 export interface Task {
   id: string;
   campaignId: string;
@@ -41,6 +61,8 @@ export interface Task {
   proofType: 'auto' | 'manual';
   proofUrl?: string;
   order: number;
+  /** Present on `hold_token` and `hold_nft` tasks. */
+  onchain?: OnchainTaskConfig;
 }
 
 export interface User {

@@ -27,7 +27,8 @@ const TASK_TYPE_OPTIONS: { value: TaskType; label: string; icon: string; color: 
   { value: 'twitter_follow', label: 'Follow on Twitter / X', icon: '𝕏', color: '#1DA1F2' },
   { value: 'twitter_retweet', label: 'Retweet / Repost', icon: '🔁', color: '#1DA1F2' },
   { value: 'discord_join', label: 'Join Discord', icon: '💬', color: '#5865F2' },
-  { value: 'hold_token', label: 'Hold Token', icon: '🪙', color: '#F59E0B' },
+  { value: 'hold_token', label: 'Hold Token (onchain)', icon: '🪙', color: '#F59E0B' },
+  { value: 'hold_nft', label: 'Hold NFT (onchain)', icon: '🖼️', color: '#FF5C00' },
   { value: 'submit_screenshot', label: 'Submit Screenshot', icon: '📸', color: '#8B5CF6' },
   { value: 'custom', label: 'Custom Task', icon: '✦', color: '#FF5C00' },
 ];
@@ -37,6 +38,7 @@ const DEFAULT_TITLES: Record<TaskType, string> = {
   twitter_retweet: 'Retweet our announcement',
   discord_join: 'Join our Discord server',
   hold_token: 'Hold [token] in your wallet',
+  hold_nft: 'Hold [collection] NFT in your wallet',
   submit_screenshot: 'Submit proof screenshot',
   custom: 'Custom task',
 };
@@ -45,7 +47,8 @@ const DEFAULT_PROOF: Record<TaskType, 'auto' | 'manual'> = {
   twitter_follow: 'auto',
   twitter_retweet: 'auto',
   discord_join: 'auto',
-  hold_token: 'manual',
+  hold_token: 'auto',
+  hold_nft: 'auto',
   submit_screenshot: 'manual',
   custom: 'manual',
 };

@@ -25,14 +25,17 @@ const REWARD_TYPES: { value: RewardType; label: string; desc: string }[] = [
   { value: 'both', label: 'Airdrop + WL', desc: 'Both rewards combined' },
 ];
 
-const TASK_TYPES: { value: TaskType; label: string }[] = [
+const TASK_TYPES: { value: TaskType; label: string; onchain?: boolean }[] = [
   { value: 'twitter_follow', label: 'Follow on X / Twitter' },
   { value: 'twitter_retweet', label: 'Retweet / Repost' },
   { value: 'discord_join', label: 'Join Discord server' },
-  { value: 'hold_token', label: 'Hold a token / NFT' },
+  { value: 'hold_token', label: 'Hold an ERC-20 token (onchain ✓)', onchain: true },
+  { value: 'hold_nft', label: 'Hold an NFT (onchain ✓)', onchain: true },
   { value: 'submit_screenshot', label: 'Submit screenshot' },
   { value: 'custom', label: 'Custom task' },
 ];
+
+const ONCHAIN_CHAINS = ['ETH', 'BASE', 'ARB', 'MATIC', 'BNB', 'AVAX'] as const;
 
 interface TaskDraft {
   id: string;
@@ -41,6 +44,14 @@ interface TaskDraft {
   type: TaskType;
   points: number;
   proofType: 'auto' | 'manual';
+  onchainChain: (typeof ONCHAIN_CHAINS)[number];
+  contractAddress: string;
+  minBalance: number;
+  symbol: string;
+}
+
+function isOnchainType(t: TaskType): boolean {
+  return t === 'hold_token' || t === 'hold_nft';
 }
 
 function newTask(): TaskDraft {
@@ -51,6 +62,10 @@ function newTask(): TaskDraft {
     type: 'twitter_follow',
     points: 100,
     proofType: 'auto',
+    onchainChain: 'BASE',
+    contractAddress: '',
+    minBalance: 1,
+    symbol: '',
   };
 }
 
@@ -110,7 +125,12 @@ export default function CreateCampaignPage() {
     name.trim().length >= 3 &&
     description.trim().length >= 10 &&
     tasks.length > 0 &&
-    tasks.every((t) => t.title.trim().length >= 2);
+    tasks.every(
+      (t) =>
+        t.title.trim().length >= 2 &&
+        (!isOnchainType(t.type) ||
+          (/^0x[a-fA-F0-9]{40}$/.test(t.contractAddress) && t.minBalance > 0)),
+    );
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -420,6 +440,93 @@ export default function CreateCampaignPage() {
                         </select>
                       </div>
                     </div>
+
+                    {isOnchainType(task.type) && (
+                      <div className="mt-3 rounded-lg border border-[#FF5C00]/20 bg-[#FF5C00]/5 p-3">
+                        <p className="text-[11px] font-mono uppercase tracking-widest text-[#FF5C00] mb-2.5">
+                          Onchain verification
+                        </p>
+                        <p className="text-xs text-[#888] mb-3 leading-relaxed">
+                          Participants must hold this {task.type === 'hold_nft' ? 'NFT' : 'token'} in their connected wallet.
+                          We read the balance live from the chain — no backend needed.
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                          <div>
+                            <label className="block text-[11px] text-[#666] uppercase tracking-wider mb-1">
+                              Chain
+                            </label>
+                            <select
+                              value={task.onchainChain}
+                              onChange={(e) =>
+                                updateTask(task.id, {
+                                  onchainChain: e.target.value as TaskDraft['onchainChain'],
+                                })
+                              }
+                              className="input"
+                            >
+                              {ONCHAIN_CHAINS.map((c) => (
+                                <option key={c} value={c}>
+                                  {c}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-[11px] text-[#666] uppercase tracking-wider mb-1">
+                              Symbol (display only)
+                            </label>
+                            <input
+                              type="text"
+                              value={task.symbol}
+                              onChange={(e) => updateTask(task.id, { symbol: e.target.value })}
+                              placeholder={task.type === 'hold_nft' ? 'CoolCats' : 'USDC'}
+                              className="input"
+                              maxLength={12}
+                            />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div className="sm:col-span-2">
+                            <label className="block text-[11px] text-[#666] uppercase tracking-wider mb-1">
+                              Contract address
+                            </label>
+                            <input
+                              type="text"
+                              value={task.contractAddress}
+                              onChange={(e) =>
+                                updateTask(task.id, { contractAddress: e.target.value })
+                              }
+                              placeholder="0x…"
+                              className="input font-mono text-xs"
+                              pattern="0x[a-fA-F0-9]{40}"
+                              title="Must be a valid 0x address (42 chars)"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] text-[#666] uppercase tracking-wider mb-1">
+                              Min balance
+                            </label>
+                            <input
+                              type="number"
+                              min={0}
+                              step="any"
+                              value={task.minBalance}
+                              onChange={(e) =>
+                                updateTask(task.id, { minBalance: Number(e.target.value) })
+                              }
+                              className="input"
+                            />
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-[#555] mt-2.5">
+                          Tip: copy the contract from{' '}
+                          <span className="text-[#888]">
+                            {task.type === 'hold_nft' ? 'OpenSea or Magic Eden' : 'CoinGecko or Etherscan'}
+                          </span>
+                          .
+                        </p>
+                      </div>
+                    )}
                   </div>
                 ))}
 

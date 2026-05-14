@@ -254,6 +254,7 @@ const TASK_TO_API: Record<TaskType, string> = {
   twitter_retweet: 'TWITTER_RETWEET',
   discord_join: 'DISCORD_JOIN',
   hold_token: 'TOKEN_HOLD',
+  hold_nft: 'NFT_HOLD',
   submit_screenshot: 'SCREENSHOT',
   custom: 'MANUAL',
 };
