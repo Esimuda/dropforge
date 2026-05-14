@@ -1,0 +1,230 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RewardType {
+  AIRDROP
+  WHITELIST
+  BOTH
+}
+
+enum CampaignStatus {
+  DRAFT
+  ACTIVE
+  ENDED
+}
+
+enum TaskType {
+  TWITTER_FOLLOW
+  TWITTER_RETWEET
+  DISCORD_JOIN
+  TOKEN_HOLD
+  MANUAL
+  SCREENSHOT
+}
+
+enum ProofType {
+  AUTO
+  MANUAL
+}
+
+enum SubmissionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum Chain {
+  ETHEREUM
+  POLYGON
+  ARBITRUM
+  BASE
+  SOLANA
+  BSC
+  OTHER
+}
+
+model User {
+  id             String   @id @default(cuid())
+  email          String?  @unique
+  username       String?
+  avatarUrl      String?
+  twitterHandle  String?
+  twitterId      String?  @unique
+  discordHandle  String?
+  discordId      String?  @unique
+  walletAddress  String?  @unique
+  createdAt      DateTime @default(now())
+
+  refreshTokens        RefreshToken[]
+  ownedProject         Project?
+  campaignParticipants CampaignParticipant[]
+  submissions          Submission[]
+  walletEntries        WalletEntry[]
+  notifications        Notification[]
+  exportLogs           ExportLog[]
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  jti       String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Project {
+  id            String   @id @default(cuid())
+  ownerId       String   @unique
+  name          String
+  logoUrl       String?
+  website       String?
+  twitterHandle String?
+  discordInvite String?
+  isVerified    Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  owner    User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  campaigns Campaign[]
+}
+
+model Campaign {
+  id              String         @id @default(cuid())
+  projectId       String
+  title           String
+  description     String?
+  bannerUrl       String?
+  chain           Chain
+  rewardType      RewardType
+  startDate       DateTime
+  endDate         DateTime
+  maxParticipants Int?
+  status          CampaignStatus @default(DRAFT)
+  deletedAt       DateTime?
+  createdAt       DateTime       @default(now())
+
+  project      Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tasks        Task[]
+  participants CampaignParticipant[]
+  submissions  Submission[]        @relation("CampaignSubmissions")
+  walletEntries WalletEntry[]
+  notifications Notification[]
+  exportLogs    ExportLog[]
+
+  @@index([projectId])
+  @@index([status, chain, rewardType])
+  @@index([deletedAt])
+}
+
+model Task {
+  id          String    @id @default(cuid())
+  campaignId  String
+  title       String
+  description String?
+  taskType    TaskType
+  points      Int       @default(0)
+  proofType   ProofType
+  metadata    Json      @default("{}")
+  order       Int       @default(0)
+  isRequired  Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+
+  campaign     Campaign      @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  submissions  Submission[]
+
+  @@index([campaignId])
+}
+
+model CampaignParticipant {
+  id            String   @id @default(cuid())
+  campaignId    String
+  userId        String
+  pointsEarned  Int      @default(0)
+  joinedAt      DateTime @default(now())
+  isWhitelisted Boolean  @default(false)
+  isEligible    Boolean  @default(true)
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, userId])
+  @@index([campaignId])
+  @@index([userId])
+}
+
+model Submission {
+  id          String            @id @default(cuid())
+  taskId      String
+  userId      String
+  campaignId  String
+  proofUrl    String?
+  proofText   String?
+  tweetUrl    String?
+  screenshotUrl String?
+  status      SubmissionStatus  @default(PENDING)
+  reviewNote  String?
+  submittedAt DateTime          @default(now())
+  reviewedAt  DateTime?
+
+  task     Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaign Campaign @relation("CampaignSubmissions", fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([taskId, userId])
+  @@index([campaignId])
+}
+
+model WalletEntry {
+  id                    String   @id @default(cuid())
+  campaignId            String
+  userId                String
+  encryptedWalletAddress String
+  chain                 Chain
+  submittedAt           DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, userId])
+  @@index([userId])
+}
+
+model Notification {
+  id                 String   @id @default(cuid())
+  userId             String
+  type               String
+  message            String
+  isRead             Boolean  @default(false)
+  relatedCampaignId  String?
+  createdAt          DateTime @default(now())
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaign Campaign? @relation(fields: [relatedCampaignId], references: [id], onDelete: SetNull)
+
+  @@index([userId, isRead])
+}
+
+model ExportLog {
+  id         String   @id @default(cuid())
+  campaignId String
+  exporterId String
+  format     String
+  filters    Json
+  createdAt  DateTime @default(now())
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  exporter User     @relation(fields: [exporterId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
+  @@index([exporterId])
+}
