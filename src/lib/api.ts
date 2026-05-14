@@ -143,7 +143,7 @@ export async function fetchCampaign(id: string): Promise<Campaign> {
     return campaign;
   }
   const raw = await api.get<unknown>(`/campaigns/${id}`);
-  return mapApiCampaignDetail(raw as ApiCampaignRow & { tasks?: unknown[] });
+  return mapApiCampaignDetail(raw as Parameters<typeof mapApiCampaignDetail>[0]);
 }
 
 export async function joinCampaign(campaignId: string): Promise<{ success: boolean }> {
@@ -258,7 +258,7 @@ export async function createCampaign(data: Partial<Campaign>): Promise<Campaign>
     maxParticipants: data.maxParticipants,
     tasks: [],
   });
-  return mapApiCampaignDetail(created as ApiCampaignRow & { tasks?: unknown[] });
+  return mapApiCampaignDetail(created as Parameters<typeof mapApiCampaignDetail>[0]);
 }
 
 export async function fetchParticipants(campaignId: string): Promise<Participant[]> {

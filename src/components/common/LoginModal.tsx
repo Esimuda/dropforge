@@ -10,6 +10,10 @@ interface LoginModalProps {
   onClose: () => void;
 }
 
+// In static / mock mode the NextAuth API route doesn't exist (GitHub Pages
+// can't serve server routes). Disable social login and prompt wallet connect.
+const STATIC_MODE = process.env.NEXT_PUBLIC_USE_MOCK === 'true';
+
 export default function LoginModal({ open, onClose }: LoginModalProps) {
   const { loginWithTwitter, loginWithDiscord } = useAuthActions();
 
@@ -65,8 +69,9 @@ export default function LoginModal({ open, onClose }: LoginModalProps) {
 
           <div className="space-y-2.5">
             <button
-              onClick={() => loginWithTwitter()}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-[#1A1A1A] border border-[#2A2A2A] hover:border-[#FF5C00]/40 hover:bg-[#1E1E1E] transition-colors text-left group"
+              onClick={() => !STATIC_MODE && loginWithTwitter()}
+              disabled={STATIC_MODE}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-[#1A1A1A] border border-[#2A2A2A] hover:border-[#FF5C00]/40 hover:bg-[#1E1E1E] transition-colors text-left group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-[#2A2A2A] disabled:hover:bg-[#1A1A1A]"
             >
               <span className="w-9 h-9 rounded-md bg-black flex items-center justify-center flex-shrink-0">
                 <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
@@ -75,13 +80,16 @@ export default function LoginModal({ open, onClose }: LoginModalProps) {
               </span>
               <div className="flex-1">
                 <p className="text-sm font-semibold text-white">Continue with X</p>
-                <p className="text-xs text-[#666]">Connect your Twitter / X account</p>
+                <p className="text-xs text-[#666]">
+                  {STATIC_MODE ? 'Available on full deploy' : 'Connect your Twitter / X account'}
+                </p>
               </div>
             </button>
 
             <button
-              onClick={() => loginWithDiscord()}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-[#1A1A1A] border border-[#2A2A2A] hover:border-[#FF5C00]/40 hover:bg-[#1E1E1E] transition-colors text-left group"
+              onClick={() => !STATIC_MODE && loginWithDiscord()}
+              disabled={STATIC_MODE}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-[#1A1A1A] border border-[#2A2A2A] hover:border-[#FF5C00]/40 hover:bg-[#1E1E1E] transition-colors text-left group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-[#2A2A2A] disabled:hover:bg-[#1A1A1A]"
             >
               <span className="w-9 h-9 rounded-md bg-[#5865F2] flex items-center justify-center flex-shrink-0">
                 <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
@@ -90,7 +98,9 @@ export default function LoginModal({ open, onClose }: LoginModalProps) {
               </span>
               <div className="flex-1">
                 <p className="text-sm font-semibold text-white">Continue with Discord</p>
-                <p className="text-xs text-[#666]">Verify your server memberships</p>
+                <p className="text-xs text-[#666]">
+                  {STATIC_MODE ? 'Available on full deploy' : 'Verify your server memberships'}
+                </p>
               </div>
             </button>
 

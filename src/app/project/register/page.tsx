@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Link from 'next/link';
+import Navbar from '@/components/common/Navbar';
 import { cn } from '@/lib/utils';
 import { useRegisterProject } from '@/hooks/useProject';
 import type { Chain } from '@/types';
@@ -244,7 +245,9 @@ export default function RegisterProjectPage() {
 
   if (success) {
     return (
-      <div className="relative min-h-screen bg-[#0A0A0A] flex items-center justify-center overflow-hidden">
+      <div className="relative min-h-screen bg-[#0A0A0A] flex flex-col overflow-hidden">
+        <Navbar />
+        <div className="relative flex flex-1 items-center justify-center overflow-hidden">
         {/* Confetti */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
           {Array.from({ length: 30 }, (_, i) => (
@@ -274,19 +277,21 @@ export default function RegisterProjectPage() {
               Go to Dashboard →
             </Link>
             <Link
-              href="/project/campaigns/create"
+              href="/campaigns/new"
               className="block w-full rounded-xl border border-[#2A2A2A] py-4 text-center text-base font-semibold text-[#999] hover:text-white hover:border-[#444] transition-colors"
             >
               Create First Campaign
             </Link>
           </div>
         </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] py-12 px-4">
+    <div className="min-h-screen bg-[#0A0A0A] py-12 px-4 flex flex-col">
+      <Navbar />
       {/* Background glow */}
       <div
         className="pointer-events-none fixed top-0 left-1/2 -translate-x-1/2 h-96 w-96 rounded-full opacity-10"

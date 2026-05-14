@@ -8,6 +8,8 @@ node_modules/
 out/
 build/
 dist/
+# Keep .nojekyll in public/ tracked
+!public/.nojekyll
 
 # Backend (NestJS) build artifacts
 backend/dist/

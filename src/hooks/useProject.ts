@@ -237,7 +237,7 @@ export function useCreateCampaign() {
           '/projects/me/campaigns',
           buildCreateCampaignBody(input),
         );
-        return mapApiCampaignDetail(created as ApiCampaignRow & { tasks?: unknown[] });
+        return mapApiCampaignDetail(created as Parameters<typeof mapApiCampaignDetail>[0]);
       } catch {
         const mock: Campaign = {
           id: `cam-${Date.now()}`,
@@ -269,6 +269,7 @@ export function useCreateCampaign() {
 export function useParticipants(campaignId: string) {
   return useQuery<Participant[]>({
     queryKey: ['participants', campaignId],
+    enabled: Boolean(campaignId),
     queryFn: async () => {
       try {
         return await fetchParticipants(campaignId);
@@ -329,6 +330,7 @@ export function useUpdateParticipantStatus() {
 export function useExportData(campaignId: string) {
   return useQuery<Participant[]>({
     queryKey: ['export', campaignId],
+    enabled: Boolean(campaignId),
     queryFn: async () => {
       if (USE_MOCK) {
         return mockParticipants;

@@ -437,7 +437,7 @@ export function WalletForm({
     setSelectedChain(chain);
     setValue('chain', chain as never);
     setValue('walletAddress', '');
-    if (isEVM) setValue('confirmAddress' as never, '');
+    if (isEVM) setValue('confirmAddress' as never, '' as never);
   };
 
   const onFormSubmit = async (data: FormData) => {

@@ -94,7 +94,11 @@ export default function CreateCampaignPage() {
       }),
     onSuccess: (campaign) => {
       setSubmitted(true);
-      setTimeout(() => router.push(`/campaigns/${campaign.id}`), 1200);
+      const target =
+        process.env.NEXT_PUBLIC_USE_MOCK === 'true'
+          ? '/campaigns'
+          : `/campaigns/${campaign.id}`;
+      setTimeout(() => router.push(target), 1200);
     },
   });
 

@@ -130,6 +130,23 @@ export default function ProjectDashboardPage() {
     );
   }
 
+  if (!isLoading && !data) {
+    return (
+      <div className="min-h-screen bg-[#0A0A0A] text-white flex flex-col items-center justify-center px-6">
+        <p className="text-[#777] text-sm mb-4">No dashboard data</p>
+        <h1 className="font-space-grotesk text-2xl font-bold mb-6 text-center">
+          Register a project to unlock the creator dashboard
+        </h1>
+        <Link
+          href="/project/register"
+          className="rounded-xl bg-[#FF5C00] px-6 py-3 text-sm font-bold text-white hover:bg-[#e05200] transition-colors"
+        >
+          Register project
+        </Link>
+      </div>
+    );
+  }
+
   if (!data) return null;
 
   const { project, stats, campaigns } = data;
@@ -187,7 +204,7 @@ export default function ProjectDashboardPage() {
         </Link>
         <div className="flex items-center gap-3">
           <Link
-            href="/project/campaigns/create"
+            href="/campaigns/new"
             className="rounded-lg bg-[#FF5C00] px-4 py-2 text-sm font-bold text-white hover:bg-[#e05200] transition-colors"
           >
             + New Campaign
@@ -301,7 +318,7 @@ export default function ProjectDashboardPage() {
               Campaigns
             </h2>
             <Link
-              href="/project/campaigns/create"
+              href="/campaigns/new"
               className="rounded-lg bg-[#FF5C00] px-4 py-2 text-sm font-bold text-white hover:bg-[#e05200] transition-colors"
             >
               + Create Campaign
@@ -313,7 +330,7 @@ export default function ProjectDashboardPage() {
               <p className="text-4xl mb-3">🎯</p>
               <p className="text-[#555] font-medium mb-4">No campaigns yet</p>
               <Link
-                href="/project/campaigns/create"
+                href="/campaigns/new"
                 className="inline-block rounded-lg bg-[#FF5C00] px-5 py-2.5 text-sm font-bold text-white hover:bg-[#e05200] transition-colors"
               >
                 Create your first campaign
@@ -491,7 +508,7 @@ export default function ProjectDashboardPage() {
               icon: '🚀',
               title: 'Create Campaign',
               desc: 'Launch a new quest or airdrop campaign',
-              href: '/project/campaigns/create',
+              href: '/campaigns/new',
               color: '#FF5C00',
             },
             {
