@@ -15,6 +15,7 @@ import { VerificationModule } from './verification/verification.module';
 import { CommonModule } from './common/common.module';
 import { MailModule } from './mail/mail.module';
 import { StorageModule } from './storage/storage.module';
+import { HealthController } from './health.controller';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { StorageModule } from './storage/storage.module';
     WalletEntriesModule,
     VerificationModule,
   ],
+  controllers: [HealthController],
   providers: [
     {
       provide: APP_GUARD,
