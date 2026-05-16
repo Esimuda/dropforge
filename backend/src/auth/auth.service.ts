@@ -98,6 +98,18 @@ export class AuthService {
     await this.prisma.refreshToken.deleteMany({ where: { userId } });
   }
 
+  private async ensureUniqueUsername(candidate: string): Promise<string> {
+    const base = candidate.replace(/\s+/g, '').slice(0, 28) || `user-${randomUUID().slice(0, 8)}`;
+    let name = base;
+    let suffix = 0;
+    // username has a UNIQUE index — append a numeric suffix on collision.
+    while (await this.prisma.user.findUnique({ where: { username: name } })) {
+      suffix += 1;
+      name = `${base}-${suffix}`;
+    }
+    return name;
+  }
+
   async loginWithTwitter(accessToken: string) {
     const { data } = await axios.get('https://api.twitter.com/2/users/me', {
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -107,17 +119,18 @@ export class AuthService {
     if (!u?.id) {
       throw new BadRequestException('Could not verify Twitter account');
     }
+    const existing = await this.prisma.user.findUnique({ where: { twitterId: u.id } });
+    const username = existing?.username ?? (await this.ensureUniqueUsername(u.name || u.username));
     const user = await this.prisma.user.upsert({
       where: { twitterId: u.id },
       create: {
         twitterId: u.id,
         twitterHandle: u.username,
-        username: u.name || u.username,
+        username,
         avatarUrl: u.profile_image_url,
       },
       update: {
         twitterHandle: u.username,
-        username: u.name || u.username,
         avatarUrl: u.profile_image_url ?? undefined,
       },
     });
@@ -131,10 +144,12 @@ export class AuthService {
     if (!data?.id) {
       throw new BadRequestException('Could not verify Discord account');
     }
-    const username = data.global_name || data.username;
+    const candidate = data.global_name || data.username;
     const avatarUrl = data.avatar
       ? `https://cdn.discordapp.com/avatars/${data.id}/${data.avatar}.png`
       : null;
+    const existing = await this.prisma.user.findUnique({ where: { discordId: data.id } });
+    const username = existing?.username ?? (await this.ensureUniqueUsername(candidate));
     const user = await this.prisma.user.upsert({
       where: { discordId: data.id },
       create: {
@@ -145,7 +160,6 @@ export class AuthService {
       },
       update: {
         discordHandle: data.username,
-        username: username ?? undefined,
         avatarUrl: avatarUrl ?? undefined,
       },
     });
@@ -164,12 +178,13 @@ export class AuthService {
       throw new BadRequestException('Signature does not match wallet');
     }
     const checksum = ethers.getAddress(normalized);
+    const existing = await this.prisma.user.findUnique({ where: { walletAddress: checksum } });
+    const username =
+      existing?.username ??
+      (await this.ensureUniqueUsername(`${checksum.slice(0, 6)}-${checksum.slice(-4)}`));
     const user = await this.prisma.user.upsert({
       where: { walletAddress: checksum },
-      create: {
-        walletAddress: checksum,
-        username: `${checksum.slice(0, 6)}…${checksum.slice(-4)}`,
-      },
+      create: { walletAddress: checksum, username },
       update: {},
     });
     return this.issueTokensForUser(user.id);

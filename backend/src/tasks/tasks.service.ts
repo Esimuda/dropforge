@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, HttpStatus } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bull';
 import type { Queue } from 'bull';
 import { PrismaService } from '../prisma/prisma.service';
@@ -11,13 +11,16 @@ import {
 } from '../prisma-enums';
 import { AppHttpException } from '../common/exceptions/app-http.exception';
 import { ErrorCodes } from '../common/errors/error-codes';
-import { HttpStatus } from '@nestjs/common';
+import { MailService } from '../mail/mail.service';
+
+const RETRY_OPTS = { attempts: 3, backoff: { type: 'exponential' as const, delay: 2000 } };
 
 @Injectable()
 export class TasksService {
   constructor(
     private readonly prisma: PrismaService,
     @InjectQueue('task-verification') private readonly verificationQueue: Queue,
+    private readonly mail: MailService,
   ) {}
 
   async getTask(taskId: string) {
@@ -101,28 +104,50 @@ export class TasksService {
         HttpStatus.FORBIDDEN,
       );
     }
-    const pending = await this.prisma.submission.findFirst({
-      where: { taskId, userId, status: SubmissionStatus.PENDING },
+    // Submission has @@unique([taskId, userId]) — if one exists, update its proof and reset to PENDING.
+    const existing = await this.prisma.submission.findUnique({
+      where: { taskId_userId: { taskId, userId } },
     });
-    if (pending) {
+    if (existing && existing.status === SubmissionStatus.PENDING) {
       throw new AppHttpException(
         ErrorCodes.ALREADY_SUBMITTED,
         'You already have a pending submission for this task.',
         HttpStatus.CONFLICT,
       );
     }
-    const submission = await this.prisma.submission.create({
-      data: {
-        taskId,
-        userId,
-        campaignId: campaign.id,
-        proofUrl: dto.proofUrl,
-        proofText: dto.proofText,
-        tweetUrl: dto.tweetUrl,
-        screenshotUrl: dto.screenshotUrl,
-        status: SubmissionStatus.PENDING,
-      },
-    });
+    if (existing && existing.status === SubmissionStatus.APPROVED) {
+      throw new AppHttpException(
+        ErrorCodes.ALREADY_SUBMITTED,
+        'This task is already approved for you.',
+        HttpStatus.CONFLICT,
+      );
+    }
+    const submission = existing
+      ? await this.prisma.submission.update({
+          where: { id: existing.id },
+          data: {
+            proofUrl: dto.proofUrl,
+            proofText: dto.proofText,
+            tweetUrl: dto.tweetUrl,
+            screenshotUrl: dto.screenshotUrl,
+            status: SubmissionStatus.PENDING,
+            reviewNote: null,
+            reviewedAt: null,
+            submittedAt: new Date(),
+          },
+        })
+      : await this.prisma.submission.create({
+          data: {
+            taskId,
+            userId,
+            campaignId: campaign.id,
+            proofUrl: dto.proofUrl,
+            proofText: dto.proofText,
+            tweetUrl: dto.tweetUrl,
+            screenshotUrl: dto.screenshotUrl,
+            status: SubmissionStatus.PENDING,
+          },
+        });
     if (task.proofType === ProofType.AUTO) {
       await this.enqueueAutoVerification(submission.id, task, userId);
     }
@@ -146,6 +171,7 @@ export class TasksService {
   ) {
     const meta = (task.metadata ?? {}) as Record<string, unknown>;
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    const chain = (meta.chain as string) || task.campaign.chain;
     switch (task.taskType) {
       case TaskType.TWITTER_FOLLOW:
         await this.verificationQueue.add(
@@ -155,7 +181,7 @@ export class TasksService {
             twitterHandle: user?.twitterHandle,
             targetHandle: meta.targetHandle as string | undefined,
           },
-          { attempts: 3, backoff: { type: 'exponential', delay: 2000 } },
+          RETRY_OPTS,
         );
         break;
       case TaskType.TWITTER_RETWEET:
@@ -166,7 +192,7 @@ export class TasksService {
             tweetId: meta.tweetId as string | undefined,
             userHandle: user?.twitterHandle,
           },
-          { attempts: 3, backoff: { type: 'exponential', delay: 2000 } },
+          RETRY_OPTS,
         );
         break;
       case TaskType.DISCORD_JOIN:
@@ -177,7 +203,7 @@ export class TasksService {
             discordUserId: user?.discordId,
             guildId: meta.guildId as string | undefined,
           },
-          { attempts: 3, backoff: { type: 'exponential', delay: 2000 } },
+          RETRY_OPTS,
         );
         break;
       case TaskType.TOKEN_HOLD:
@@ -186,11 +212,24 @@ export class TasksService {
           {
             submissionId,
             walletAddress: user?.walletAddress,
-            chain: (meta.chain as string) || task.campaign.chain,
+            chain,
             contractAddress: meta.contractAddress as string | undefined,
             minAmount: meta.minAmount as string | undefined,
           },
-          { attempts: 3, backoff: { type: 'exponential', delay: 2000 } },
+          RETRY_OPTS,
+        );
+        break;
+      case TaskType.NFT_HOLD:
+        await this.verificationQueue.add(
+          'VERIFY_NFT_HOLD',
+          {
+            submissionId,
+            walletAddress: user?.walletAddress,
+            chain,
+            contractAddress: meta.contractAddress as string | undefined,
+            minAmount: (meta.minAmount as string | undefined) ?? '1',
+          },
+          RETRY_OPTS,
         );
         break;
       default:
@@ -201,20 +240,21 @@ export class TasksService {
   private async recomputeEligibility(campaignId: string, userId: string) {
     const required = await this.prisma.task.findMany({
       where: { campaignId, isRequired: true },
+      select: { id: true },
     });
-    if (!required.length) {
-      return;
-    }
     const approved = await this.prisma.submission.findMany({
       where: { campaignId, userId, status: SubmissionStatus.APPROVED },
       distinct: ['taskId'],
       select: { taskId: true },
     });
     const approvedSet = new Set(approved.map((a: (typeof approved)[number]) => a.taskId));
-    const eligible = required.every((t: (typeof required)[number]) => approvedSet.has(t.id));
+    const tasksCompleted = approvedSet.size;
+    const eligible =
+      required.length > 0 &&
+      required.every((t: (typeof required)[number]) => approvedSet.has(t.id));
     await this.prisma.campaignParticipant.updateMany({
       where: { campaignId, userId },
-      data: { isEligible: eligible },
+      data: { isEligible: eligible, tasksCompleted },
     });
   }
 
@@ -227,6 +267,7 @@ export class TasksService {
     const task = await this.assertOwnerForTask(ownerId, taskId);
     const submission = await this.prisma.submission.findFirst({
       where: { id: submissionId, taskId },
+      include: { user: { select: { email: true, username: true } } },
     });
     if (!submission) {
       throw new AppHttpException(ErrorCodes.NOT_FOUND, 'Submission not found', HttpStatus.NOT_FOUND);
@@ -264,11 +305,26 @@ export class TasksService {
               ? `Your submission for "${task.title}" was approved (+${task.points} points).`
               : `Your submission for "${task.title}" was rejected.${dto.note ? ` Note: ${dto.note}` : ''}`,
           relatedCampaignId: task.campaignId,
+          relatedTaskId: task.id,
         },
       });
     });
     if (status === SubmissionStatus.APPROVED) {
       await this.recomputeEligibility(task.campaignId, submission.userId);
+    }
+    if (submission.user.email) {
+      const mailCtx = {
+        username: submission.user.username,
+        taskTitle: task.title,
+        campaignTitle: task.campaign.title,
+        points: task.points,
+        reason: dto.note ?? null,
+      };
+      if (status === SubmissionStatus.APPROVED) {
+        await this.mail.sendTaskApproved(submission.user.email, mailCtx);
+      } else {
+        await this.mail.sendTaskRejected(submission.user.email, mailCtx);
+      }
     }
     return { id: submission.id, status };
   }

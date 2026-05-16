@@ -1,5 +1,6 @@
-import { IsEnum, IsNotEmpty, IsString } from 'class-validator';
-import { Chain } from '../../prisma-enums';
+import { IsNotEmpty, IsString } from 'class-validator';
+import type { Chain } from '../../prisma-enums';
+import { IsChain } from '../../common/validators/chain.validator';
 
 export class CreateWalletEntryDto {
   @IsString()
@@ -10,6 +11,6 @@ export class CreateWalletEntryDto {
   @IsNotEmpty()
   walletAddress!: string;
 
-  @IsEnum(Chain)
+  @IsChain()
   chain!: Chain;
 }

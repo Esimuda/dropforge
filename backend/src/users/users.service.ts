@@ -4,7 +4,7 @@ import { AppHttpException } from '../common/exceptions/app-http.exception';
 import { ErrorCodes } from '../common/errors/error-codes';
 import { HttpStatus } from '@nestjs/common';
 import { UpdateProfileDto } from './dto/update-profile.dto';
-import { Chain } from '../prisma-enums';
+import type { Chain } from '../prisma-enums';
 
 @Injectable()
 export class UsersService {

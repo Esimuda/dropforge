@@ -351,6 +351,62 @@ export function useExportData(campaignId: string) {
   });
 }
 
+export type WhitelistMode = 'TOP_PERFORMERS' | 'RANDOM' | 'HYBRID';
+
+export interface SelectWhitelistInput {
+  campaignId: string;
+  mode: WhitelistMode;
+  count: number;
+  filters?: {
+    hasWallet?: boolean;
+    minPoints?: number;
+    completedRequired?: boolean;
+  };
+}
+
+export function useSelectWhitelist() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: SelectWhitelistInput) => {
+      const { campaignId, ...body } = input;
+      return api.post<{ granted: number; mode: WhitelistMode; userIds: string[] }>(
+        `/projects/me/campaigns/${campaignId}/select-whitelist`,
+        body,
+      );
+    },
+    onSuccess: (_data, { campaignId }) => {
+      queryClient.invalidateQueries({ queryKey: ['participants', campaignId] });
+    },
+  });
+}
+
+export function previewWhitelistSelection(
+  participants: Participant[],
+  mode: WhitelistMode,
+  count: number,
+  filters?: { hasWallet?: boolean; minPoints?: number; completedRequired?: boolean },
+): Participant[] {
+  const filtered = participants.filter((p) => {
+    if (filters?.hasWallet && !p.walletSubmitted) return false;
+    if (filters?.minPoints != null && (p.points ?? 0) < filters.minPoints) return false;
+    if (filters?.completedRequired && p.tasksCompleted < (p.totalTasks ?? 0)) return false;
+    return true;
+  });
+  if (mode === 'TOP_PERFORMERS') {
+    return [...filtered].sort((a, b) => (b.points ?? 0) - (a.points ?? 0)).slice(0, count);
+  }
+  if (mode === 'RANDOM') {
+    return [...filtered].sort(() => Math.random() - 0.5).slice(0, count);
+  }
+  const top = [...filtered].sort((a, b) => (b.points ?? 0) - (a.points ?? 0));
+  const half = Math.floor(count / 2);
+  const topPicks = top.slice(0, half);
+  const taken = new Set(topPicks.map((p) => p.userId));
+  const remainder = filtered.filter((p) => !taken.has(p.userId));
+  const random = [...remainder].sort(() => Math.random() - 0.5).slice(0, count - topPicks.length);
+  return [...topPicks, ...random];
+}
+
 export function useRegisterProject() {
   return useMutation({
     mutationFn: async (data: {

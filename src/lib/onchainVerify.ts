@@ -9,7 +9,10 @@ import {
 } from 'viem/chains';
 import type { OnchainChain, OnchainTaskConfig, Task } from '@/types';
 
-const CHAIN_MAP: Record<OnchainChain, Chain> = {
+// Map of EVM chains supported by the client-side verifier. SOL is intentionally
+// excluded — Solana onchain verification requires a different client (web3.js /
+// @solana/spl-token) and is handled server-side by the verification worker.
+const CHAIN_MAP: Partial<Record<OnchainChain, Chain>> = {
   ETH: mainnet,
   BASE: base,
   ARB: arbitrum,
@@ -83,6 +86,12 @@ export async function verifyOnchainTask(
     return { ok: false, reason: 'Task is missing onchain configuration.' };
   }
 
+  if (config.chain === 'SOL') {
+    return {
+      ok: false,
+      reason: 'Solana onchain verification is handled server-side; client cannot verify.',
+    };
+  }
   const chain = CHAIN_MAP[config.chain];
   if (!chain) {
     return { ok: false, reason: `Unsupported chain: ${config.chain}` };

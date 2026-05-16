@@ -2,6 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { ethers } from 'ethers';
+import type { Chain } from '../prisma-enums';
+
+const ERC20_ABI = [
+  'function balanceOf(address) view returns (uint256)',
+  'function decimals() view returns (uint8)',
+];
+
+const ERC721_ABI = ['function balanceOf(address) view returns (uint256)'];
 
 @Injectable()
 export class VerificationChecksService {
@@ -70,23 +78,19 @@ export class VerificationChecksService {
 
   async verifyTokenHold(params: {
     walletAddress?: string | null;
-    chain?: string | null;
+    chain?: Chain | string | null;
     contractAddress?: string | null;
     minAmount?: string | null;
   }): Promise<{ ok: boolean; reason?: string }> {
     if (!params.walletAddress || !params.contractAddress) {
       return { ok: false, reason: 'Wallet or contract not provided.' };
     }
-    const rpcUrl = this.rpcForChain(params.chain);
+    const rpcUrl = this.rpcForChain(params.chain ?? null);
     if (!rpcUrl) {
       return { ok: false, reason: 'RPC not configured for this chain.' };
     }
     const provider = new ethers.JsonRpcProvider(rpcUrl);
-    const erc20 = new ethers.Contract(
-      params.contractAddress,
-      ['function balanceOf(address) view returns (uint256)'],
-      provider,
-    );
+    const erc20 = new ethers.Contract(params.contractAddress, ERC20_ABI, provider);
     const bal: bigint = await erc20.balanceOf(params.walletAddress);
     const min = params.minAmount ? BigInt(params.minAmount) : 1n;
     if (bal < min) {
@@ -95,14 +99,42 @@ export class VerificationChecksService {
     return { ok: true };
   }
 
-  private rpcForChain(chain?: string | null): string | null {
+  async verifyNftHold(params: {
+    walletAddress?: string | null;
+    chain?: Chain | string | null;
+    contractAddress?: string | null;
+    minAmount?: string | null;
+  }): Promise<{ ok: boolean; reason?: string }> {
+    if (!params.walletAddress || !params.contractAddress) {
+      return { ok: false, reason: 'Wallet or contract not provided.' };
+    }
+    const rpcUrl = this.rpcForChain(params.chain ?? null);
+    if (!rpcUrl) {
+      return { ok: false, reason: 'RPC not configured for this chain.' };
+    }
+    const provider = new ethers.JsonRpcProvider(rpcUrl);
+    const erc721 = new ethers.Contract(params.contractAddress, ERC721_ABI, provider);
+    const bal: bigint = await erc721.balanceOf(params.walletAddress);
+    const min = params.minAmount ? BigInt(params.minAmount) : 1n;
+    if (bal < min) {
+      return { ok: false, reason: 'NFT balance below minimum.' };
+    }
+    return { ok: true };
+  }
+
+  private rpcForChain(chain: Chain | string | null): string | null {
+    if (!chain) {
+      return this.config.get<string>('RPC_ETHEREUM') ?? null;
+    }
     const map: Record<string, string | undefined> = {
-      ETHEREUM: this.config.get('RPC_ETHEREUM'),
-      POLYGON: this.config.get('RPC_POLYGON'),
-      BASE: this.config.get('RPC_BASE'),
-      ARBITRUM: this.config.get('RPC_ARBITRUM'),
-      BSC: this.config.get('RPC_BSC'),
+      ETH: this.config.get<string>('RPC_ETHEREUM'),
+      BASE: this.config.get<string>('RPC_BASE'),
+      ARB: this.config.get<string>('RPC_ARBITRUM'),
+      MATIC: this.config.get<string>('RPC_POLYGON'),
+      BNB: this.config.get<string>('RPC_BSC'),
+      AVAX: this.config.get<string>('RPC_AVALANCHE'),
+      SOL: this.config.get<string>('RPC_SOLANA'),
     };
-    return (chain && map[chain]) || this.config.get('RPC_ETHEREUM') || null;
+    return map[chain] ?? this.config.get<string>('RPC_ETHEREUM') ?? null;
   }
 }

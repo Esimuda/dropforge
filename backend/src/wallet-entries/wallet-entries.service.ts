@@ -2,7 +2,7 @@ import { Injectable, HttpStatus } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { WalletCryptoService } from '../common/crypto/wallet-crypto.service';
 import { CreateWalletEntryDto } from './dto/wallet-entry.dto';
-import { CampaignStatus, Chain } from '../prisma-enums';
+import { CampaignStatus } from '../prisma-enums';
 import { AppHttpException } from '../common/exceptions/app-http.exception';
 import { ErrorCodes } from '../common/errors/error-codes';
 import { isValidWalletForChain, normalizeEvmAddress } from './wallet-validation';
@@ -46,8 +46,7 @@ export class WalletEntriesService {
         HttpStatus.BAD_REQUEST,
       );
     }
-    const plain =
-      dto.chain === Chain.SOLANA ? dto.walletAddress : normalizeEvmAddress(dto.walletAddress);
+    const plain = dto.chain === 'SOL' ? dto.walletAddress : normalizeEvmAddress(dto.walletAddress);
     const encrypted = this.walletCrypto.encrypt(plain);
     const existing = await this.prisma.walletEntry.findUnique({
       where: { campaignId_userId: { campaignId: dto.campaignId, userId } },
@@ -55,13 +54,18 @@ export class WalletEntriesService {
     const row = existing
       ? await this.prisma.walletEntry.update({
           where: { id: existing.id },
-          data: { encryptedWalletAddress: encrypted, chain: dto.chain },
+          data: {
+            encryptedWalletAddress: encrypted.encryptedWalletAddress,
+            iv: encrypted.iv,
+            chain: dto.chain,
+          },
         })
       : await this.prisma.walletEntry.create({
           data: {
             campaignId: dto.campaignId,
             userId,
-            encryptedWalletAddress: encrypted,
+            encryptedWalletAddress: encrypted.encryptedWalletAddress,
+            iv: encrypted.iv,
             chain: dto.chain,
           },
         });

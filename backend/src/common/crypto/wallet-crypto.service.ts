@@ -1,6 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'crypto';
 
+export type EncryptedWallet = {
+  // base64(ciphertext) + '.' + base64(authTag)
+  encryptedWalletAddress: string;
+  // base64(iv)
+  iv: string;
+};
+
 @Injectable()
 export class WalletCryptoService {
   private getKey(): Buffer {
@@ -11,23 +18,25 @@ export class WalletCryptoService {
     return scryptSync(raw, 'dropforge-wallet-salt', 32);
   }
 
-  /** Returns base64: iv:ciphertext:authTag (all hex or base64 segments) */
-  encrypt(plain: string): string {
+  encrypt(plain: string): EncryptedWallet {
     const key = this.getKey();
     const iv = randomBytes(12);
     const cipher = createCipheriv('aes-256-gcm', key, iv);
     const enc = Buffer.concat([cipher.update(plain, 'utf8'), cipher.final()]);
     const tag = cipher.getAuthTag();
-    return [iv.toString('base64'), enc.toString('base64'), tag.toString('base64')].join('.');
+    return {
+      encryptedWalletAddress: `${enc.toString('base64')}.${tag.toString('base64')}`,
+      iv: iv.toString('base64'),
+    };
   }
 
-  decrypt(payload: string): string {
+  decrypt(payload: EncryptedWallet): string {
     const key = this.getKey();
-    const [ivB64, dataB64, tagB64] = payload.split('.');
-    if (!ivB64 || !dataB64 || !tagB64) {
+    const [dataB64, tagB64] = payload.encryptedWalletAddress.split('.');
+    if (!dataB64 || !tagB64 || !payload.iv) {
       throw new Error('Invalid ciphertext');
     }
-    const iv = Buffer.from(ivB64, 'base64');
+    const iv = Buffer.from(payload.iv, 'base64');
     const data = Buffer.from(dataB64, 'base64');
     const tag = Buffer.from(tagB64, 'base64');
     const decipher = createDecipheriv('aes-256-gcm', key, iv);

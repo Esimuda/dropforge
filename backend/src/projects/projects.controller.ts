@@ -14,32 +14,46 @@ import {
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { ProjectsService } from './projects.service';
+import { TasksService } from '../tasks/tasks.service';
+import { VerifySubmissionDto } from '../tasks/dto/task.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ProjectOwnerGuard } from '../common/guards/project-owner.guard';
+import { HttpStatus } from '@nestjs/common';
+import { AppHttpException } from '../common/exceptions/app-http.exception';
+import { ErrorCodes } from '../common/errors/error-codes';
+import { PrismaService } from '../prisma/prisma.service';
 import { CreateProjectDto, UpdateProjectDto } from './dto/project.dto';
 import {
   CreateCampaignDto,
   UpdateCampaignDto,
   ExportQueryDto,
   WhitelistBodyDto,
+  SelectWhitelistDto,
 } from './dto/campaign.dto';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 
 @Controller('projects')
 export class ProjectsController {
-  constructor(private readonly projects: ProjectsService) {}
+  constructor(
+    private readonly projects: ProjectsService,
+    private readonly tasks: TasksService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   @Post()
   @UseInterceptors(
-    FileFieldsInterceptor([{ name: 'logo', maxCount: 1 }], { storage: memoryStorage() }),
+    FileFieldsInterceptor([{ name: 'logo', maxCount: 1 }], {
+      storage: memoryStorage(),
+      limits: { fileSize: 5 * 1024 * 1024 },
+    }),
   )
   register(
     @CurrentUser() user: { sub: string },
     @Body() dto: CreateProjectDto,
     @UploadedFiles() files?: { logo?: Express.Multer.File[] },
   ) {
-    const buf = files?.logo?.[0]?.buffer;
-    return this.projects.registerProject(user.sub, dto, buf);
+    const file = files?.logo?.[0];
+    return this.projects.registerProject(user.sub, dto, file);
   }
 
   @UseGuards(ProjectOwnerGuard)
@@ -50,7 +64,10 @@ export class ProjectsController {
 
   @UseGuards(ProjectOwnerGuard)
   @UseInterceptors(
-    FileFieldsInterceptor([{ name: 'logo', maxCount: 1 }], { storage: memoryStorage() }),
+    FileFieldsInterceptor([{ name: 'logo', maxCount: 1 }], {
+      storage: memoryStorage(),
+      limits: { fileSize: 5 * 1024 * 1024 },
+    }),
   )
   @Patch('me')
   updateMyProject(
@@ -58,8 +75,8 @@ export class ProjectsController {
     @Body() dto: UpdateProjectDto,
     @UploadedFiles() files?: { logo?: Express.Multer.File[] },
   ) {
-    const buf = files?.logo?.[0]?.buffer;
-    return this.projects.updateMyProject(user.sub, dto, buf);
+    const file = files?.logo?.[0];
+    return this.projects.updateMyProject(user.sub, dto, file);
   }
 
   @UseGuards(ProjectOwnerGuard)
@@ -136,5 +153,37 @@ export class ProjectsController {
     @Body() body: WhitelistBodyDto,
   ) {
     return this.projects.setWhitelist(user.sub, id, userId, body.whitelisted);
+  }
+
+  @UseGuards(ProjectOwnerGuard)
+  @Post('me/campaigns/:id/select-whitelist')
+  selectWhitelist(
+    @CurrentUser() user: { sub: string },
+    @Param('id') id: string,
+    @Body() body: SelectWhitelistDto,
+  ) {
+    return this.projects.selectWhitelist(user.sub, id, body);
+  }
+
+  @UseGuards(ProjectOwnerGuard)
+  @Patch('me/campaigns/:id/submissions/:submissionId')
+  async reviewSubmission(
+    @CurrentUser() user: { sub: string },
+    @Param('id') campaignId: string,
+    @Param('submissionId') submissionId: string,
+    @Body() body: VerifySubmissionDto,
+  ) {
+    const submission = await this.prisma.submission.findFirst({
+      where: { id: submissionId, campaignId },
+      select: { taskId: true },
+    });
+    if (!submission) {
+      throw new AppHttpException(
+        ErrorCodes.NOT_FOUND,
+        'Submission not found',
+        HttpStatus.NOT_FOUND,
+      );
+    }
+    return this.tasks.verifySubmission(user.sub, submission.taskId, submissionId, body);
   }
 }

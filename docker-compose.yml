@@ -1,0 +1,47 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: dropforge
+      POSTGRES_PASSWORD: dropforge
+      POSTGRES_DB: dropforge
+    ports:
+      - "5432:5432"
+    volumes:
+      - dropforge_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dropforge"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: ./backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://dropforge:dropforge@postgres:5432/dropforge?schema=public
+      REDIS_URL: redis://redis:6379
+      JWT_ACCESS_SECRET: dev-access-secret
+      JWT_REFRESH_SECRET: dev-refresh-secret
+      WALLET_ENCRYPTION_KEY: dev-wallet-key
+      FRONTEND_URL: http://localhost:8080
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+
+volumes:
+  dropforge_pg:

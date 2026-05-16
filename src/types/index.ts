@@ -11,8 +11,10 @@ export type TaskType =
   | 'custom';
 export type TaskStatus = 'locked' | 'available' | 'completed' | 'pending_verification';
 
-/** Chains we can verify onchain task state for via viem. */
-export type OnchainChain = 'ETH' | 'BASE' | 'ARB' | 'MATIC' | 'BNB' | 'AVAX';
+/** Chains we can verify onchain task state for. EVM chains go through viem;
+ *  SOL is recognized but verification is not yet implemented client-side and
+ *  is expected to be handled by the backend. */
+export type OnchainChain = 'ETH' | 'BASE' | 'ARB' | 'MATIC' | 'BNB' | 'AVAX' | 'SOL';
 
 export interface Campaign {
   id: string;

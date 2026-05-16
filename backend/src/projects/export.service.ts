@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { WalletCryptoService } from '../common/crypto/wallet-crypto.service';
-import { SubmissionStatus, Chain } from '../prisma-enums';
+import { SubmissionStatus, WhitelistStatus } from '../prisma-enums';
 
 type TaskRow = { id: string; isRequired: boolean };
 
@@ -33,16 +33,18 @@ export class ExportService {
 
   private async logExport(
     campaignId: string,
-    exporterUserId: string,
+    exportedBy: string,
     format: string,
     filters: ExportFilters,
+    recordCount: number,
   ) {
     await this.prisma.exportLog.create({
       data: {
         campaignId,
-        exporterId: exporterUserId,
+        exportedBy,
         format,
         filters: filters as object,
+        recordCount,
       },
     });
   }
@@ -84,18 +86,24 @@ export class ExportService {
     const wallets: {
       userId: string;
       encryptedWalletAddress: string;
-      chain: Chain;
-    }[] = await this.prisma.walletEntry.findMany({
-      where: { campaignId },
-    });
+      iv: string;
+      chain: string;
+    }[] = await this.prisma.walletEntry.findMany({ where: { campaignId } });
     const walletMap = new Map(wallets.map((w) => [w.userId, w]));
+
+    const slots: { userId: string; status: WhitelistStatus }[] =
+      await this.prisma.whitelistSlot.findMany({ where: { campaignId } });
+    const whitelistSet = new Set(
+      slots.filter((s) => s.status === WhitelistStatus.GRANTED).map((s) => s.userId),
+    );
 
     const rows: ExportRow[] = [];
     for (const p of participants) {
       if (filters.minPoints != null && p.pointsEarned < filters.minPoints) {
         continue;
       }
-      if (filters.onlyWhitelisted && !p.isWhitelisted) {
+      const isWhitelisted = whitelistSet.has(p.userId);
+      if (filters.onlyWhitelisted && !isWhitelisted) {
         continue;
       }
       const w = walletMap.get(p.userId);
@@ -116,7 +124,10 @@ export class ExportService {
       let walletAddress: string | null = null;
       if (w) {
         try {
-          walletAddress = this.walletCrypto.decrypt(w.encryptedWalletAddress);
+          walletAddress = this.walletCrypto.decrypt({
+            encryptedWalletAddress: w.encryptedWalletAddress,
+            iv: w.iv,
+          });
         } catch {
           walletAddress = null;
         }
@@ -130,7 +141,7 @@ export class ExportService {
         pointsEarned: p.pointsEarned,
         tasksCompleted,
         joinedAt: p.joinedAt.toISOString(),
-        whitelisted: p.isWhitelisted,
+        whitelisted: isWhitelisted,
       });
     }
     return rows;
@@ -139,19 +150,20 @@ export class ExportService {
   async generateJson(
     campaignId: string,
     filters: ExportFilters,
-    exporterUserId: string,
+    exportedBy: string,
   ): Promise<ExportRow[]> {
-    await this.logExport(campaignId, exporterUserId, 'json', filters);
-    return this.buildRows(campaignId, filters);
+    const rows = await this.buildRows(campaignId, filters);
+    await this.logExport(campaignId, exportedBy, 'JSON', filters, rows.length);
+    return rows;
   }
 
   async generateCsv(
     campaignId: string,
     filters: ExportFilters,
-    exporterUserId: string,
+    exportedBy: string,
   ): Promise<string> {
-    await this.logExport(campaignId, exporterUserId, 'csv', filters);
     const rows = await this.buildRows(campaignId, filters);
+    await this.logExport(campaignId, exportedBy, 'CSV', filters, rows.length);
     const headers = [
       'username',
       'twitterHandle',

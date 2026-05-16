@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import Navbar from '../../../../../components/common/Navbar';
 import ParticipantTable from '../../../../../components/project/ParticipantTable';
+import WhitelistSelector from '../../../../../components/project/WhitelistSelector';
 import LoadingSkeleton from '../../../../../components/common/LoadingSkeleton';
 import { useParticipants, useUpdateParticipantStatus } from '@/hooks/useProject';
 import { useCampaign } from '@/hooks/useCampaigns';
@@ -73,14 +74,20 @@ export default function ParticipantsPage() {
             ))}
           </div>
         ) : (
-          <ParticipantTable
-            participants={participantsView}
-            isLoading={false}
-            onStatusUpdate={(userId, status, note) => {
-              if (!campaignId) return;
-              updateStatus.mutate({ campaignId, userId, status, note });
-            }}
-          />
+          <div className="space-y-6">
+            <WhitelistSelector
+              campaignId={campaignId}
+              participants={participantsView}
+            />
+            <ParticipantTable
+              participants={participantsView}
+              isLoading={false}
+              onStatusUpdate={(userId, status, note) => {
+                if (!campaignId) return;
+                updateStatus.mutate({ campaignId, userId, status, note });
+              }}
+            />
+          </div>
         )}
       </section>
     </main>

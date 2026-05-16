@@ -3,6 +3,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { CampaignsController } from './campaigns.controller';
 import { CampaignsService } from './campaigns.service';
+import { CampaignsSchedulerService } from './campaigns-scheduler.service';
 import { OptionalJwtGuard } from '../common/guards/optional-jwt.guard';
 
 @Module({
@@ -17,6 +18,6 @@ import { OptionalJwtGuard } from '../common/guards/optional-jwt.guard';
     }),
   ],
   controllers: [CampaignsController],
-  providers: [CampaignsService, OptionalJwtGuard],
+  providers: [CampaignsService, CampaignsSchedulerService, OptionalJwtGuard],
 })
 export class CampaignsModule {}

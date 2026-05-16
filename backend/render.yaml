@@ -1,0 +1,57 @@
+# Render.com deployment blueprint for the Dropforge backend.
+# Run `render blueprint launch` from this directory or import via the Render dashboard.
+
+services:
+  - type: web
+    name: dropforge-api
+    runtime: node
+    rootDir: backend
+    plan: starter
+    buildCommand: npm ci && npx prisma generate && npm run build
+    startCommand: node dist/main.js
+    healthCheckPath: /
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: WALLET_ENCRYPTION_KEY
+        sync: false
+      - key: TWITTER_CLIENT_ID
+        sync: false
+      - key: TWITTER_CLIENT_SECRET
+        sync: false
+      - key: TWITTER_BEARER_TOKEN
+        sync: false
+      - key: DISCORD_CLIENT_ID
+        sync: false
+      - key: DISCORD_CLIENT_SECRET
+        sync: false
+      - key: DISCORD_BOT_TOKEN
+        sync: false
+      - key: CLOUDINARY_URL
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: ETHERSCAN_API_KEY
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: RPC_ETHEREUM
+        sync: false
+      - key: RPC_BASE
+        sync: false
+      - key: RPC_ARBITRUM
+        sync: false
+      - key: RPC_POLYGON
+        sync: false
+      - key: RPC_BSC
+        sync: false
+      - key: RPC_AVALANCHE
+        sync: false
+      - key: RPC_SOLANA
+        sync: false

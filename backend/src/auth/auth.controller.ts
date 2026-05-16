@@ -38,8 +38,8 @@ export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
   @Public()
-  @Throttle({ default: { limit: 30, ttl: 60_000 } })
-  @Post('twitter')
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @Post(['twitter', 'twitter/callback'])
   async twitter(@Body() dto: TwitterAuthDto, @Res({ passthrough: true }) res: Response) {
     const tokens = await this.auth.loginWithTwitter(dto.accessToken);
     setAuthCookies(res, tokens.accessToken, tokens.refreshToken);
@@ -47,8 +47,8 @@ export class AuthController {
   }
 
   @Public()
-  @Throttle({ default: { limit: 30, ttl: 60_000 } })
-  @Post('discord')
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @Post(['discord', 'discord/callback'])
   async discord(@Body() dto: DiscordAuthDto, @Res({ passthrough: true }) res: Response) {
     const tokens = await this.auth.loginWithDiscord(dto.accessToken);
     setAuthCookies(res, tokens.accessToken, tokens.refreshToken);
@@ -56,7 +56,7 @@ export class AuthController {
   }
 
   @Public()
-  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('wallet')
   async wallet(@Body() dto: WalletAuthDto, @Res({ passthrough: true }) res: Response) {
     const tokens = await this.auth.loginWithWallet(dto.address, dto.message, dto.signature);

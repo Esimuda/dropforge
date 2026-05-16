@@ -33,7 +33,7 @@ export class UsersController {
     return this.users.listNotifications(user.sub, page, limit);
   }
 
-  @Patch('me/notifications/read')
+  @Patch(['me/notifications/read', 'me/notifications/read-all'])
   readNotifications(@CurrentUser() user: { sub: string }) {
     return this.users.markAllNotificationsRead(user.sub);
   }

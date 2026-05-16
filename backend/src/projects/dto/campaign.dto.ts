@@ -11,7 +11,9 @@ import {
   IsObject,
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
-import { Chain, RewardType, TaskType, ProofType, CampaignStatus } from '../../prisma-enums';
+import type { Chain } from '../../prisma-enums';
+import { IsChain } from '../../common/validators/chain.validator';
+import { RewardType, TaskType, ProofType, CampaignStatus } from '../../prisma-enums';
 
 export class CreateTaskDto {
   @IsString()
@@ -48,11 +50,10 @@ export class CreateCampaignDto {
   @IsString()
   title!: string;
 
-  @IsOptional()
   @IsString()
-  description?: string;
+  description!: string;
 
-  @IsEnum(Chain)
+  @IsChain()
   chain!: Chain;
 
   @IsEnum(RewardType)
@@ -86,7 +87,7 @@ export class UpdateCampaignDto {
   description?: string;
 
   @IsOptional()
-  @IsEnum(Chain)
+  @IsChain()
   chain?: Chain;
 
   @IsOptional()
@@ -141,4 +142,39 @@ export class ExportQueryDto {
 export class WhitelistBodyDto {
   @IsBoolean()
   whitelisted!: boolean;
+}
+
+export enum WhitelistMode {
+  TOP_PERFORMERS = 'TOP_PERFORMERS',
+  RANDOM = 'RANDOM',
+  HYBRID = 'HYBRID',
+}
+
+export class SelectWhitelistFiltersDto {
+  @IsOptional()
+  @IsBoolean()
+  hasWallet?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  minPoints?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  completedRequired?: boolean;
+}
+
+export class SelectWhitelistDto {
+  @IsEnum(WhitelistMode)
+  mode!: WhitelistMode;
+
+  @IsInt()
+  @Min(1)
+  count!: number;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => SelectWhitelistFiltersDto)
+  filters?: SelectWhitelistFiltersDto;
 }

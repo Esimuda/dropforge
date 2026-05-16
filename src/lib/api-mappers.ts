@@ -47,32 +47,27 @@ export type ApiTaskRow = {
   userStatus?: { submissionStatus?: string };
 };
 
-const CHAIN_FROM_API: Record<string, Chain> = {
+// Backend stores chain as a free-form string using the same canonical values
+// the frontend uses (ETH/SOL/BNB/MATIC/BASE/ARB/AVAX). Translation is a no-op,
+// the helpers exist so legacy API rows ("ETHEREUM", "BSC", ...) still resolve.
+const LEGACY_FROM_API: Record<string, Chain> = {
   ETHEREUM: 'ETH',
   POLYGON: 'MATIC',
   ARBITRUM: 'ARB',
-  BASE: 'BASE',
   SOLANA: 'SOL',
   BSC: 'BNB',
   OTHER: 'ETH',
 };
 
-const CHAIN_TO_API: Record<Chain, string> = {
-  ETH: 'ETHEREUM',
-  MATIC: 'POLYGON',
-  ARB: 'ARBITRUM',
-  BASE: 'BASE',
-  SOL: 'SOLANA',
-  BNB: 'BSC',
-  AVAX: 'OTHER',
-};
+const VALID_CHAINS = new Set<Chain>(['ETH', 'SOL', 'BNB', 'MATIC', 'ARB', 'BASE', 'AVAX']);
 
 export function mapChainFromApi(chain: string): Chain {
-  return CHAIN_FROM_API[chain] ?? 'ETH';
+  if (VALID_CHAINS.has(chain as Chain)) return chain as Chain;
+  return LEGACY_FROM_API[chain] ?? 'ETH';
 }
 
 export function mapChainToApi(chain: Chain): string {
-  return CHAIN_TO_API[chain] ?? 'ETHEREUM';
+  return chain;
 }
 
 export function mapRewardFromApi(r: string): RewardType {
@@ -83,6 +78,8 @@ export function mapRewardFromApi(r: string): RewardType {
 
 export function mapStatusFromApi(s: string): CampaignStatus {
   const x = s.toLowerCase();
+  // CANCELLED collapses to "ended" in the UI — there's no separate cancelled state on the frontend.
+  if (x === 'cancelled') return 'ended';
   if (x === 'active' || x === 'ended' || x === 'draft') return x;
   return 'active';
 }
@@ -92,6 +89,7 @@ const TASK_FROM_API: Record<string, TaskType> = {
   TWITTER_RETWEET: 'twitter_retweet',
   DISCORD_JOIN: 'discord_join',
   TOKEN_HOLD: 'hold_token',
+  NFT_HOLD: 'hold_nft',
   MANUAL: 'custom',
   SCREENSHOT: 'submit_screenshot',
 };
